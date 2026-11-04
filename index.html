@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お魚ゲーム - 大食いマリンアドベンチャー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #031329;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        /* Custom animations */
+        @keyframes pulse-subtle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <!-- Game Canvas Container -->
+    <div id="game-container" class="relative w-full h-screen overflow-hidden flex items-center justify-center">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- UI Overlay: HUD -->
+        <div id="hud" class="ui-overlay p-4 flex justify-between items-start hidden">
+            <!-- Hunger Bar (満腹度) -->
+            <div class="bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-4 w-72 md:w-96 shadow-lg">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-cyan-300 font-bold text-sm tracking-wide">満腹度 (HUNGER)</span>
+                    <span id="hunger-text" class="text-white font-extrabold text-sm">0%</span>
+                </div>
+                <div class="w-full bg-gray-800/80 rounded-full h-5 p-0.5 overflow-hidden border border-cyan-400/20 relative">
+                    <div id="hunger-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 transition-all duration-300 w-0 shadow-[0_0_12px_rgba(34,211,238,0.6)]"></div>
+                </div>
+            </div>
+
+            <!-- Score & Level Info -->
+            <div class="bg-black/40 backdrop-blur-md border border-cyan-500/30 rounded-2xl px-6 py-3 shadow-lg flex items-center gap-6">
+                <div>
+                    <div class="text-cyan-300 font-bold text-xs">SCORE</div>
+                    <div id="score-text" class="text-2xl font-black text-yellow-400">0</div>
+                </div>
+                <div class="h-8 w-px bg-cyan-500/30"></div>
+                <div>
+                    <div class="text-cyan-300 font-bold text-xs">SIZE</div>
+                    <div id="size-text" class="text-2xl font-black text-white">Lv.1</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UI Overlay: Start Screen -->
+        <div id="start-screen" class="ui-overlay interactive flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div class="bg-gradient-to-b from-slate-900/90 to-blue-950/90 border border-cyan-500/40 rounded-3xl p-8 max-w-md w-11/12 text-center shadow-2xl relative overflow-hidden">
+                <div class="absolute -top-10 -left-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-2xl"></div>
+                <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl"></div>
+
+                <div class="text-5xl mb-2">🐟</div>
+                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-teal-200 to-emerald-300 mb-2">
+                    お魚ゲーム
+                </h1>
+                <p class="text-cyan-200 text-sm mb-6">〜 大食いマリンアドベンチャー 〜</p>
+
+                <!-- Instructions -->
+                <div class="bg-blue-900/40 rounded-2xl p-4 mb-6 text-left border border-cyan-500/20 text-xs text-blue-100 space-y-2.5">
+                    <div class="flex items-start gap-2">
+                        <span class="bg-emerald-500/20 text-emerald-300 p-1 rounded font-bold">1</span>
+                        <span>自分より<b>小さい魚</b>を食べまくって満腹度を<b>100%</b>にしよう！</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="bg-emerald-500/20 text-emerald-300 p-1 rounded font-bold">2</span>
+                        <span>魚を食べるとプレイヤーの身体がどんどん大きくなるよ！</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="bg-red-500/20 text-red-300 p-1 rounded font-bold">⚠️</span>
+                        <span class="text-red-200"><b>釣りの罠（仕掛けエサ）</b>に食いつくと即ゲームオーバー！人間には気をつけて！</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="bg-cyan-500/20 text-cyan-300 p-1 rounded font-bold">🎮</span>
+                        <span><b>操作:</b> マウス追従 / タッチドラッグ / 矢印キー(WASD)</span>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black text-lg rounded-2xl shadow-lg shadow-cyan-500/30 transform transition active:scale-95 animate-pulse-subtle">
+                    海へ飛び込む！ (START)
+                </button>
+            </div>
+        </div>
+
+        <!-- UI Overlay: Game Over Screen -->
+        <div id="game-over-screen" class="ui-overlay interactive flex items-center justify-center bg-black/80 backdrop-blur-md hidden">
+            <div class="bg-gradient-to-b from-slate-900/90 to-red-950/90 border border-red-500/40 rounded-3xl p-8 max-w-md w-11/12 text-center shadow-2xl">
+                <div class="text-6xl mb-3">🪝💥</div>
+                <h2 class="text-3xl font-extrabold text-red-400 mb-1">GAME OVER</h2>
+                <p class="text-gray-300 text-sm mb-6">釣りのエサにパクッと食いついてしまった！</p>
+
+                <div class="bg-black/40 rounded-2xl p-4 mb-6 border border-red-500/20 text-center">
+                    <div class="text-xs text-gray-400 mb-1">最終スコア</div>
+                    <div id="final-score-over" class="text-4xl font-black text-yellow-400 mb-2">0</div>
+                    <div class="text-xs text-gray-400">達成した満腹度: <span id="final-hunger-over" class="text-cyan-300 font-bold">0%</span></div>
+                </div>
+
+                <button id="restart-btn-over" class="w-full py-4 bg-gradient-to-r from-red-500 to-amber-500 hover:from-red-400 hover:to-amber-400 text-slate-950 font-black text-lg rounded-2xl shadow-lg shadow-red-500/30 transform transition active:scale-95">
+                    もう一度挑戦する
+                </button>
+            </div>
+        </div>
+
+        <!-- UI Overlay: Game Clear Screen -->
+        <div id="game-clear-screen" class="ui-overlay interactive flex items-center justify-center bg-black/70 backdrop-blur-md hidden">
+            <div class="bg-gradient-to-b from-slate-900/90 to-emerald-950/90 border border-emerald-500/40 rounded-3xl p-8 max-w-md w-11/12 text-center shadow-2xl relative overflow-hidden">
+                <div class="text-6xl mb-3 animate-bounce">👑🐠</div>
+                <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-emerald-300 to-teal-200 mb-1">
+                    GAME CLEAR!
+                </h2>
+                <p class="text-emerald-200 text-sm mb-6">おめでとう！お腹いっぱいで海の王様だ！</p>
+
+                <div class="bg-black/40 rounded-2xl p-4 mb-6 border border-emerald-500/20 text-center">
+                    <div class="text-xs text-gray-400 mb-1">ハイスコア達成！</div>
+                    <div id="final-score-clear" class="text-4xl font-black text-yellow-400 mb-2">0</div>
+                    <div class="text-xs text-emerald-300">満腹度 100% 達成 🎉</div>
+                </div>
+
+                <button id="restart-btn-clear" class="w-full py-4 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transform transition active:scale-95">
+                    海の世界をもう一度遊ぶ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // Sound System (Web Audio API)
+        // ==========================================
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playEat() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            playGameOver() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.5);
+
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            }
+
+            playWin() {
+                if (!this.ctx) return;
+                const notes = [400, 500, 600, 800];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.2);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(this.ctx.currentTime + idx * 0.1);
+                    osc.stop(this.ctx.currentTime + idx * 0.1 + 0.2);
+                });
+            }
+        }
+
+        const soundFX = new SoundFX();
+
+        // ==========================================
+        // Game Setup & Logic
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const gameClearScreen = document.getElementById('game-clear-screen');
+        const hud = document.getElementById('hud');
+        const hungerBar = document.getElementById('hunger-bar');
+        const hungerText = document.getElementById('hunger-text');
+        const scoreText = document.getElementById('score-text');
+        const sizeText = document.getElementById('size-text');
+
+        let width, height;
+        let gameState = 'START'; // START, PLAYING, GAMEOVER, CLEAR
+        let score = 0;
+        let hunger = 0; // 0 to 100
+        let animationFrameId;
+
+        // Player properties
+        const player = {
+            x: 0,
+            y: 0,
+            radius: 18,
+            targetX: 0,
+            targetY: 0,
+            speed: 0.12,
+            facingRight: true,
+            mouthOpen: 0,
+            color: '#00f0ff',
+            trail: []
+        };
+
+        // Key states
+        const keys = {};
+
+        // Entities arrays
+        let preyList = [];
+        let baitList = [];
+        let particles = [];
+        let bubbles = [];
+
+        // Resize Canvas
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            if (gameState === 'START') {
+                player.x = width / 2;
+                player.y = height / 2;
+                player.targetX = width / 2;
+                player.targetY = height / 2;
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Controls: Mouse & Touch
+        window.addEventListener('mousemove', (e) => {
+            if (gameState === 'PLAYING') {
+                player.targetX = e.clientX;
+                player.targetY = e.clientY;
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (gameState === 'PLAYING' && e.touches.length > 0) {
+                player.targetX = e.touches[0].clientX;
+                player.targetY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        // Controls: Keyboard
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            keys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            keys[e.code] = false;
+        });
+
+        // Initialize Background Elements
+        function initBubbles() {
+            bubbles = [];
+            for (let i = 0; i < 35; i++) {
+                bubbles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: Math.random() * 4 + 1,
+                    speed: Math.random() * 1.5 + 0.5,
+                    swing: Math.random() * 2,
+                    swingSpeed: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        // Spawn Prey (Smaller or edible fish)
+        function spawnPrey() {
+            const fromLeft = Math.random() < 0.5;
+            // Radius scales slightly with player radius, but always edible
+            const maxRad = Math.max(8, player.radius * 0.85);
+            const minRad = 6;
+            const rad = Math.random() * (maxRad - minRad) + minRad;
+
+            const colors = ['#ff597b', '#ff9e00', '#ffd166', '#06d6a0', '#118ab2', '#a06cd5'];
+
+            preyList.push({
+                x: fromLeft ? -30 : width + 30,
+                y: Math.random() * (height - 100) + 50,
+                radius: rad,
+                vx: (fromLeft ? 1 : -1) * (Math.random() * 2 + 1.2),
+                vy: Math.sin(Math.random() * Math.PI) * 0.5,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                swimCycle: Math.random() * Math.PI * 2
+            });
+        }
+
+        // Spawn Bait/Hook Traps
+        function spawnBait() {
+            // Suspended from top with a fishing line
+            baitList.push({
+                x: Math.random() * (width - 100) + 50,
+                y: -40,
+                targetY: Math.random() * (height * 0.75) + 60,
+                radius: 12,
+                speed: Math.random() * 2 + 1.2,
+                swing: Math.random() * Math.PI * 2,
+                swingSpeed: Math.random() * 0.035 + 0.015,
+                hasWorm: true
+            });
+        }
+
+        // Particles for eating & effects
+        function createEatenParticles(x, y, color, count = 8) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 3 + 1,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.02
+                });
+            }
+        }
+
+        // Reset & Start Game
+        function startGame() {
+            soundFX.init();
+            score = 0;
+            hunger = 0;
+            player.radius = 16;
+            player.x = width / 2;
+            player.y = height / 2;
+            player.targetX = width / 2;
+            player.targetY = height / 2;
+
+            preyList = [];
+            baitList = [];
+            particles = [];
+
+            initBubbles();
+
+            // Populate initial prey
+            for (let i = 0; i < 12; i++) {
+                spawnPrey();
+            }
+
+            // Populate initial bait/hooks (Increased to 8-10 initial traps)
+            for (let i = 0; i < 9; i++) {
+                spawnBait();
+            }
+
+            gameState = 'PLAYING';
+
+            // UI updates
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            gameClearScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+
+            updateHUD();
+        }
+
+        function updateHUD() {
+            hungerBar.style.width = `${Math.min(100, Math.max(0, hunger))}%`;
+            hungerText.textContent = `${Math.floor(hunger)}%`;
+            scoreText.textContent = score;
+
+            // Size level calculation
+            const sizeLv = Math.floor((player.radius - 16) / 4) + 1;
+            sizeText.textContent = `Lv.${sizeLv}`;
+        }
+
+        // Trigger Game Over
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            soundFX.playGameOver();
+
+            document.getElementById('final-score-over').textContent = score;
+            document.getElementById('final-hunger-over').textContent = `${Math.floor(hunger)}%`;
+
+            hud.classList.add('hidden');
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        // Trigger Game Clear
+        function triggerGameClear() {
+            gameState = 'CLEAR';
+            soundFX.playWin();
+
+            document.getElementById('final-score-clear').textContent = score;
+
+            hud.classList.add('hidden');
+            gameClearScreen.classList.remove('hidden');
+
+            // Victory particle burst
+            for (let i = 0; i < 100; i++) {
+                createEatenParticles(width / 2, height / 2, ['#ffd166', '#06d6a0', '#ff597b', '#22d3ee'][i % 4], 1);
+            }
+        }
+
+        // Main Game Loop
+        function gameLoop() {
+            // Clear Screen
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Ocean Gradient Background
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+            bgGrad.addColorStop(0, '#0a2540');
+            bgGrad.addColorStop(0.5, '#05192d');
+            bgGrad.addColorStop(1, '#020c1b');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Update & Render Ambient Bubbles
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 1;
+            bubbles.forEach(b => {
+                b.y -= b.speed;
+                b.x += Math.sin(b.y * b.swingSpeed) * 0.5;
+                if (b.y < -10) {
+                    b.y = height + 10;
+                    b.x = Math.random() * width;
+                }
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // GAMEPLAY LOGIC (When playing)
+            if (gameState === 'PLAYING') {
+                // Keyboard Movement Handling
+                const kbSpeed = 6;
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.targetX -= kbSpeed;
+                if (keys['ArrowRight'] || keys['d'] || keys['D']) player.targetX += kbSpeed;
+                if (keys['ArrowUp'] || keys['w'] || keys['W']) player.targetY -= kbSpeed;
+                if (keys['ArrowDown'] || keys['s'] || keys['S']) player.targetY += kbSpeed;
+
+                // Keep target in bounds
+                player.targetX = Math.max(player.radius, Math.min(width - player.radius, player.targetX));
+                player.targetY = Math.max(player.radius, Math.min(height - player.radius, player.targetY));
+
+                // Smooth movement towards target
+                const dx = player.targetX - player.x;
+                const dy = player.targetY - player.y;
+
+                player.x += dx * player.speed;
+                player.y += dy * player.speed;
+
+                // Facing direction
+                if (Math.abs(dx) > 1) {
+                    player.facingRight = dx > 0;
+                }
+
+                // Mouth movement cycle
+                player.mouthOpen = (Math.sin(Date.now() * 0.01) + 1) * 0.2;
+
+                // Spawn management
+                if (preyList.length < 15 && Math.random() < 0.04) spawnPrey();
+                
+                // Increase active bait traps count to 8~12
+                if (baitList.length < 11 && Math.random() < 0.06) spawnBait();
+
+                // Spawning passive hunger reduction (slow challenge)
+                hunger = Math.max(0, hunger - 0.015);
+                updateHUD();
+            }
+
+            // Update & Draw Bait / Hooks
+            for (let i = baitList.length - 1; i >= 0; i--) {
+                const b = baitList[i];
+
+                if (b.y < b.targetY) {
+                    b.y += b.speed;
+                } else {
+                    b.swing += b.swingSpeed;
+                    b.x += Math.sin(b.swing) * 0.5;
+                }
+
+                // Draw Fishing Line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(b.x, 0);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+
+                // Draw Hook & Bait (The Trap!)
+                ctx.save();
+                ctx.translate(b.x, b.y);
+
+                // Shiny Metallic Hook
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 4, 8, 0, Math.PI, false);
+                ctx.lineTo(8, -4);
+                ctx.stroke();
+
+                // Delicious Worm Bait on hook
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(-2, 10, 5, 0, Math.PI * 2);
+                ctx.arc(2, 12, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Warning Glow around Trap
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+                ctx.beginPath();
+                ctx.arc(0, 6, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                // Collision check with Player
+                if (gameState === 'PLAYING') {
+                    const dist = Math.hypot(player.x - b.x, player.y - (b.y + 6));
+                    if (dist < player.radius + b.radius - 4) {
+                        createEatenParticles(b.x, b.y, '#ef4444', 15);
+                        triggerGameOver();
+                    }
+                }
+
+                // Remove out of bounds bait (if dragged up, though currently stays suspended)
+            }
+
+            // Update & Draw Prey
+            for (let i = preyList.length - 1; i >= 0; i--) {
+                const p = preyList[i];
+                p.x += p.vx;
+                p.swimCycle += 0.1;
+                p.y += Math.sin(p.swimCycle) * 0.4;
+
+                // Draw Prey Fish
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                if (p.vx < 0) ctx.scale(-1, 1);
+
+                // Body
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, p.radius * 1.3, p.radius * 0.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tail
+                ctx.beginPath();
+                ctx.moveTo(-p.radius, 0);
+                ctx.lineTo(-p.radius * 1.8, -p.radius * 0.6);
+                ctx.lineTo(-p.radius * 1.8, p.radius * 0.6);
+                ctx.closePath();
+                ctx.fill();
+
+                // Eye
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(p.radius * 0.5, -p.radius * 0.2, p.radius * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(p.radius * 0.6, -p.radius * 0.2, p.radius * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                // Collision with Player
+                if (gameState === 'PLAYING') {
+                    const dist = Math.hypot(player.x - p.x, player.y - p.y);
+                    if (dist < player.radius + p.radius * 0.5) {
+                        // Eat Prey!
+                        soundFX.playEat();
+                        createEatenParticles(p.x, p.y, p.color, 10);
+
+                        // Gains
+                        const hungerGain = (p.radius / player.radius) * 12;
+                        hunger = Math.min(100, hunger + hungerGain);
+                        score += Math.floor(p.radius * 10);
+
+                        // Player slightly grows
+                        if (player.radius < 45) {
+                            player.radius += 0.3;
+                        }
+
+                        // Remove prey
+                        preyList.splice(i, 1);
+                        updateHUD();
+
+                        // Check WIN Condition
+                        if (hunger >= 100) {
+                            triggerGameClear();
+                        }
+                    }
+                }
+
+                // Remove out of bounds prey
+                if (p.x < -50 || p.x > width + 50) {
+                    preyList.splice(i, 1);
+                }
+            }
+
+            // Draw Player Fish
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            if (!player.facingRight) ctx.scale(-1, 1);
+
+            // Glow around Player
+            const aura = ctx.createRadialGradient(0, 0, player.radius * 0.5, 0, 0, player.radius * 1.8);
+            aura.addColorStop(0, 'rgba(34, 211, 238, 0.3)');
+            aura.addColorStop(1, 'rgba(34, 211, 238, 0)');
+            ctx.fillStyle = aura;
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tail
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.moveTo(-player.radius * 0.8, 0);
+            ctx.lineTo(-player.radius * 1.7, -player.radius * 0.8);
+            ctx.lineTo(-player.radius * 1.7, player.radius * 0.8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main Body
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, player.radius * 1.4, player.radius, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Decorative Fins / Stripes
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.ellipse(-player.radius * 0.2, 0, player.radius * 0.3, player.radius * 0.6, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mouth (Animates opening)
+            ctx.fillStyle = '#031329';
+            ctx.beginPath();
+            ctx.moveTo(player.radius * 0.8, 0);
+            ctx.arc(player.radius * 0.8, 0, player.radius * 0.5, -player.mouthOpen, player.mouthOpen, false);
+            ctx.closePath();
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(player.radius * 0.6, -player.radius * 0.3, player.radius * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(player.radius * 0.7, -player.radius * 0.3, player.radius * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye Highlight
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(player.radius * 0.75, -player.radius * 0.35, player.radius * 0.06, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Render Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.alpha -= pt.decay;
+
+                if (pt.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = pt.alpha;
+                ctx.fillStyle = pt.color;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Loop Request
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listeners for UI Buttons
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn-over').addEventListener('click', startGame);
+        document.getElementById('restart-btn-clear').addEventListener('click', startGame);
+
+        // Start Loop
+        window.onload = () => {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
